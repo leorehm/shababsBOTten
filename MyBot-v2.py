@@ -5,8 +5,6 @@ from collections import OrderedDict
 game = hlt.Game("shabab")
 logging.info("Starting bot")
 
-
-
 while True:
     game_map = game.update_map()
     command_queue = []
@@ -30,14 +28,14 @@ while True:
         
         closest_empty_planets = []
         closest_enemy_ships = []
+        
         for distance in entities_by_distance:
             if isinstance(entities_by_distance[distance][0], hlt.entity.Planet) and not entities_by_distance[distance][0].is_owned():
-                closest_empty_planets.append(entities_by_distance[distance][0])
+                closest_empty_planets.append(entities_by_distance[distance][0]) 
         
             elif isinstance(entities_by_distance[distance][0], hlt.entity.Ship) and entities_by_distance[distance][0] not in team_ships:
                     closest_enemy_ships.append(entities_by_distance[distance][0])
         
-        # If there is more than one emtpy planet, go to the closest one
         if len(closest_empty_planets) > 0:
             target_planet = closest_empty_planets[0]
             if ship.can_dock(target_planet):
