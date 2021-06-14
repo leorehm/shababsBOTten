@@ -17,7 +17,8 @@ import logging
 
 # GAME START
 # Here we define the bot's name as Settler and initialize the game, including communication with the Halite engine.
-game = hlt.Game("Settler")  #umbennen in Shabab ? :D
+game = hlt.Game("player2") 
+
 # Then we print our start message to the logs
 logging.info("Starting my Settler bot!")
 
@@ -53,8 +54,7 @@ while True:
 
 
                 command_queue.append(ship.dock(planet))
-            else: # hinzugefügt
-
+            else: 
                 if planet in planned_planets:
                     continue
 
@@ -70,14 +70,15 @@ while True:
                     navigate_command = ship.navigate(
                         ship.closest_point_to(planet),
                         game_map,
-                        speed=int(hlt.constants.MAX_SPEED/2),
+                        speed=int(hlt.constants.MAX_SPEED),
                         ignore_ships=True)
+                    
                 # If the move is possible, add it to the command_queue (if there are too many obstacles on the way
                 # or we are trapped (or we reached our destination!), navigate_command will return null;
                 # don't fret though, we can run the command again the next turn)
                 if navigate_command: # Prüfe, ob die if Schleife die Richtige Einrückung hat
                     command_queue.append(navigate_command)
-                    planned_planets.append(planet) #hinzugefügt
+                    planned_planets.append(planet) 
             break
 
     # Send our set of commands to the Halite engine for this turn
