@@ -1,3 +1,11 @@
+# Beginn Deep Learning
+# featureset is an input vector to the neural network and the labels will be the output layer.
+# Featuresets must all be identical, and each index in each featureset must be of identical type to the next featureset's index.
+
+
+# imports
+#bringing in hlt to use the built-in functions, logging for logging, we want to have an ordered dictionary,
+# numpy for number crunching things, random to make random choices, and os to delete some files to start fresh.
 import hlt
 import logging
 from collections import OrderedDict
@@ -5,35 +13,38 @@ import numpy as np
 import random
 import os
 
-VERSION = 1
 
-HM_ENT_FEATURES = 5
-PCT_CHANGE_CHANCE = 5
+VERSION = 1
+# compute the bot against himself
+
+HM_ENT_FEATURES = 5 # how many features per type of entity are we interested in --> have features like "open ülanets" and "enemy planets" -->  is how many to care about per feature type
+PCT_CHANGE_CHANCE = 30  #what % chance to change the ships plans
 DESIRED_SHIP_COUNT = 20
 
-game = hlt.Game("Shabab{}".format(VERSION))
+#basic game data
+game = hlt.Game("shabab".format(VERSION))
 logging.info("Shabab-{} Start".format(VERSION))
-
+# like to keep track of plans for the ship
 ship_plans = {}
 
+#track moves and save the winner's move at the end
+if os.path.exists("c{}_input.vec".format(VERSION)):
+    os.remove("c{}_input.vec".format(VERSION))
 
-def handle_list(l):
-    new_list = []
-    for i in range(HM_ENT_FEATURES):
-        try:
-            new_list.append(l[i])
-        except:
-            new_list.append(-99)
-    return new_list
+if os.path.exists("c{}_out.vec".format(VERSION)):
+    os.remove("c{}_out.vec".format(VERSION))
 
-
+# help Functions
+# grabs a dictionary's key by a value, used to grab an entity's distance
 def key_by_value(dictionary, value):
     for k, v in dictionary.items():
         if v[0] == value:
             return k
     return -99
 
-
+# appends to the lists of data if there aren't enough entities.
+# For example, if we set HM_ENT_FEATURES to 5, this would mean we expect to have things like 5 enemy planets.
+# There are going to be times when we simply don't have 5 enemy planets, so that function just pads out whatever values we do have.
 def fix_data(data):
     new_list = []
     last_known_idx = 0
@@ -48,16 +59,10 @@ def fix_data(data):
     return new_list
 
 
-if os.path.exists("c{}_input.vec".format(VERSION)):
-    os.remove("c{}_input.vec".format(VERSION))
-
-if os.path.exists("c{}_out.vec".format(VERSION)):
-    os.remove("c{}_out.vec".format(VERSION))
-
 while True:
     game_map = game.update_map()
     command_queue = []
-
+    #  grab how many ships we and our enemies have
     team_ships = game_map.get_me().all_ships()
     all_ships = game_map._all_ships()
     enemy_ships = [ship for ship in game_map._all_ships() if ship not in team_ships]
@@ -65,7 +70,7 @@ while True:
     my_ship_count = len(team_ships)
     enemy_ship_count = len(enemy_ships)
     all_ship_count = len(all_ships)
-
+    # gather planet information
     my_id = game_map.get_me().id
 
     empty_planet_sizes = {}
@@ -86,19 +91,25 @@ while True:
     hm_enemy_planets = len(enemy_planet_sizes)
 
     empty_planet_keys = sorted([k for k in empty_planet_sizes])[::-1]
-
     our_planet_keys = sorted([k for k in our_planet_sizes])[::-1]
-
     enemy_planet_keys = sorted([k for k in enemy_planet_sizes])[::-1]
+
+    # Informationen die wir pro Schiff brauchen
+    # we care about the closest "X" enemies to each ship, not just a random "X" enemies.
+    # Same with planets, we're really interested in the closest ones, in order by distance.
 
     for ship in game_map.get_me().all_ships():
         try:
+            if ship.docking_status != ship.DockingStatus.UNDOCKED:
+                # Skip this ship ->  leave docked ships docked
+                continue
 
             shipid = ship.id
             change = False
-            if random.randint(1, 100) <= PCT_CHANGE_CHANCE:
+            if random.randint(1, 100) <= PCT_CHANGE_CHANCE: # Now we determine if we'd like to change this ship's plans, if it has any.
                 change = True
 
+#Next, we're ready to compute a bunch of features. Here are the ones I intend to track:
             entities_by_distance = game_map.nearby_entities_by_distance(ship)
             entities_by_distance = OrderedDict(sorted(entities_by_distance.items(), key=lambda t: t[0]))
 
@@ -180,18 +191,22 @@ while True:
             input_vector = []
 
             for i in entity_lists:
-                for ii in i[:HM_ENT_FEATURES]:
-                    input_vector.append(ii)
+                for j in i[:HM_ENT_FEATURES]:
+                    input_vector.append(j)
 
             input_vector += [my_ship_count,
                              enemy_ship_count,
                              hm_our_planets,
                              hm_empty_planets,
                              hm_enemy_planets]
+            # sollten wir mehr Schiffe haben, als wir mindestens brauchen, sollten wir Angreifen
+            # Aggressivere Variante entweder direkt 1 Schiff mehr oder doppelt so viele  Schiffe wie der Gegner?
 
             if my_ship_count > DESIRED_SHIP_COUNT:
-                output_vector = 3 * [0]
-                output_vector[0] = 1
+                '''ATTACK: [1,0,0]'''
+
+                output_vector = 3 * [0]  # [0,0,0]
+                output_vector[0] = 1  # [1,0,0]
                 ship_plans[ship.id] = output_vector
 
             elif change or ship.id not in ship_plans:
@@ -206,17 +221,10 @@ while True:
                 '''continue to execute existing plan'''
                 output_vector = ship_plans[ship.id]
 
-            # output_vector = [0,0,0,1]
-
-            closest_empty_planets = fix_data(closest_empty_planets)
-            closest_my_planets = fix_data(closest_my_planets)
-            closest_enemy_planets = fix_data(closest_enemy_planets)
-            closest_team_ships = fix_data(closest_team_ships)
-            closest_enemy_ships = fix_data(closest_enemy_ships)
-
             try:
+
                 # ATTACK ENEMY SHIP #
-                if np.argmax(output_vector) == 0:
+                if np.argmax(output_vector) == 0:  # [1,0,0]
                     '''
                     type: 0
                     Find closest enemy ship, and attack!
@@ -230,6 +238,7 @@ while True:
 
                         if navigate_command:
                             command_queue.append(navigate_command)
+
 
 
                 # MINE ONE OF OUR PLANETS #
@@ -293,6 +302,8 @@ while True:
                             command_queue.append(navigate_command)
 
 
+
+
                 # FIND AND MINE AN EMPTY PLANET #
                 elif np.argmax(output_vector) == 2:
                     '''
@@ -325,7 +336,10 @@ while True:
 
                             if navigate_command:
                                 command_queue.append(navigate_command)
+# We try to find an empty planet. If there are none, we attack!
 
+
+#  closes off the trys, saves the moves, and sends game commands
             except Exception as e:
                 logging.info(str(e))
 
@@ -343,3 +357,5 @@ while True:
     game.send_command_queue(command_queue)
     # TURN END
 # GAME END
+
+# inspired by https://pythonprogramming.net/deep-learning-halite-ii-artificial-intelligence-competition/
